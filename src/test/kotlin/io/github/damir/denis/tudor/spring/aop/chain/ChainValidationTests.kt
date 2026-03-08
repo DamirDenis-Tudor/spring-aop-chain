@@ -1,13 +1,16 @@
 package io.github.damir.denis.tudor.spring.aop.chain
 
-import io.github.damir.denis.tudor.spring.aop.chain.aspect.Chainable
-import io.github.damir.denis.tudor.spring.aop.chain.aspect.ChainStep
+import io.github.damir.denis.tudor.spring.aop.chain.interfaces.Chainable
+import io.github.damir.denis.tudor.spring.aop.chain.annotation.ChainStep
+import io.github.damir.denis.tudor.spring.aop.chain.registry.ChainResult
+import io.github.damir.denis.tudor.spring.aop.chain.annotation.ChainStart
 import org.junit.jupiter.api.Test
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.stereotype.Service
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -193,6 +196,37 @@ class ChainValidationTests {
     fun `should fail on type mismatch in the middle of a chain`() {
         contextRunner
             .withUserConfiguration(MismatchMiddleConfig::class.java)
+            .run { context -> assertNotNull(context.startupFailure) }
+    }
+
+    @ChainStep(next = WrongReturnEnd::class)
+    class WrongReturnStart : Chainable<String, Int> {
+        override fun proceed(input: String): Int = input.toInt()
+    }
+
+    @ChainStep
+    class WrongReturnEnd : Chainable<Int, Double> {
+        override fun proceed(input: Int): Double = input * 2.5
+    }
+
+    @Service
+    class WrongResultTypeCaller {
+        @ChainStart(node = WrongReturnStart::class)
+        fun wrongType(input: String): ChainResult<String> = ChainResult.Pending
+    }
+
+    @Configuration
+    @EnableAutoConfiguration
+    class WrongResultTypeConfig {
+        @Bean fun wrongReturnStart() = WrongReturnStart()
+        @Bean fun wrongReturnEnd() = WrongReturnEnd()
+        @Bean fun wrongResultTypeCaller() = WrongResultTypeCaller()
+    }
+
+    @Test
+    fun `should fail when ChainStart return type does not match chain output`() {
+        contextRunner
+            .withUserConfiguration(WrongResultTypeConfig::class.java)
             .run { context -> assertNotNull(context.startupFailure) }
     }
 }

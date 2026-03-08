@@ -1,7 +1,7 @@
 package io.github.damir.denis.tudor.spring.aop.chain.registry
 
-import io.github.damir.denis.tudor.spring.aop.chain.aspect.Chainable
-import io.github.damir.denis.tudor.spring.aop.chain.aspect.ChainStep
+import io.github.damir.denis.tudor.spring.aop.chain.interfaces.Chainable
+import io.github.damir.denis.tudor.spring.aop.chain.annotation.ChainStep
 import org.springframework.aop.framework.Advised
 import org.springframework.aop.support.AopUtils
 import org.springframework.context.ApplicationContext

@@ -1,4 +1,4 @@
-package io.github.damir.denis.tudor.spring.aop.chain.aspect
+package io.github.damir.denis.tudor.spring.aop.chain.annotation
 
 import kotlin.reflect.KClass
 
