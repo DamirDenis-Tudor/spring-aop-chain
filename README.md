@@ -2,12 +2,12 @@
 
 A Spring Boot auto-configured library for building type-safe processing chains using AOP and annotations.
 
-Define chain steps as Spring beans, wire them together with `@ChainStep`, and let the library handle execution, validation, and error propagation.
+Define chain steps as Spring beans, wire them together with `@ChainStep`, and trigger execution with `@ChainStart`. The library handles validation, execution, and error propagation.
 
 ## Features
 
 - Declarative chain definition via `@ChainStep` annotation
-- Two execution styles: `@ChainStart` (recommended) and AOP on `Chainable.proceed()`
+- Chain execution via `@ChainStart`
 - Start execution from any node in the chain
 - Multiple disconnected chains in the same application
 - Multiple chains can share common steps
@@ -24,7 +24,7 @@ Add the dependency to your project:
 
 ```kotlin
 // Gradle (Kotlin DSL)
-implementation("io.github.damirdenis-tudor:spring-aop-chain:0.0.1")
+implementation("io.github.damirdenis-tudor:spring-aop-chain:0.0.2")
 ```
 
 ```xml
@@ -32,11 +32,11 @@ implementation("io.github.damirdenis-tudor:spring-aop-chain:0.0.1")
 <dependency>
     <groupId>io.github.damirdenis-tudor</groupId>
     <artifactId>spring-aop-chain</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
 </dependency>
 ```
 
-Make sure you have `spring-boot-starter-aop` on your classpath.
+Make sure you have `spring-boot-starter-aop` (or `spring-aop` + `aspectjweaver`) on your classpath.
 
 ## Public API
 
@@ -47,7 +47,7 @@ Make sure you have `spring-boot-starter-aop` on your classpath.
 | `@ChainStart` | Annotation that triggers chain execution from a method |
 | `ChainResult<T>` | Sealed class wrapping the chain's output |
 
-All other classes (`ChainNode`, `ChainAspect`, `ChainStartAspect`, `ChainAutoConfiguration`, `ChainExecutor`, registry and validation internals) are `internal` and not part of the public API.
+All other classes (`ChainNode`, `ChainStartAspect`, `ChainAutoConfiguration`, `ChainExecutor`, registry and validation internals) are `internal` and not part of the public API.
 
 ## Quick Start
 
@@ -87,17 +87,16 @@ The last step in a chain omits the `next` parameter (or sets it to `Unit::class`
 
 ### 2. Execute the chain
 
-#### Option A: `@ChainStart` (recommended)
-
 Annotate any method with `@ChainStart` and return `ChainResult<T>`. The aspect intercepts the call, runs the chain, and replaces the return value:
 
 ```kotlin
 @RestController
-class MyController {
+@RequestMapping("/process")
+open class MyController {
 
-    @GetMapping("/process")
+    @PostMapping
     @ChainStart(node = ValidationService::class)
-    fun process(@RequestParam input: String): ChainResult<Int> = ChainResult.Pending
+    open fun process(@RequestBody input: String): ChainResult<Int> = ChainResult.Pending
 }
 ```
 
@@ -117,24 +116,41 @@ At startup, the library validates:
 
 If any check fails, the application fails to start.
 
-#### Option B: AOP on `Chainable.proceed()` (implicit)
-
-Inject the first step and call `proceed()`. The aspect intercepts the call and runs the entire chain:
-
-```kotlin
-@RestController
-class MyController(
-    @Qualifier("validationService")
-    private val chain: Chainable<String, String>
-) {
-    @GetMapping("/process")
-    fun process(@RequestParam input: String): String {
-        return chain.proceed(input)
-    }
-}
-```
-
-> **Note:** With this style, the return type at the injection point must match the first step's declared output type. If the chain transforms types (e.g., `String → Int`), use `@ChainStart` instead.
+> **Important: AOP proxy and self-invocation**
+>
+> `@ChainStart` relies on Spring AOP, which is proxy-based. The aspect only fires when the method is called **from outside the bean** (i.e., through the Spring proxy).
+>
+> Calling a `@ChainStart` method from within the same class (`this.method()`) bypasses the proxy and the chain will **not** execute — `ChainResult.Pending` will be returned as-is.
+>
+> ```kotlin
+> // ✅ Works — called from outside through the proxy
+> @PostMapping
+> @ChainStart(node = ValidationService::class)
+> open fun process(@RequestBody input: String): ChainResult<Int> = ChainResult.Pending
+>
+> // ❌ Does NOT work — self-invocation bypasses the proxy
+> @PostMapping
+> open fun process(@RequestBody input: String) = startChain(input)
+>
+> @ChainStart(node = ValidationService::class)
+> open fun startChain(input: String): ChainResult<Int> = ChainResult.Pending
+> ```
+>
+> If you need to separate the endpoint from the chain trigger, extract `@ChainStart` into a separate `@Service` bean and inject it:
+>
+> ```kotlin
+> @Service
+> open class ProcessChainService {
+>     @ChainStart(node = ValidationService::class)
+>     open fun execute(input: String): ChainResult<Int> = ChainResult.Pending
+> }
+>
+> @RestController
+> class MyController(private val chain: ProcessChainService) {
+>     @PostMapping("/process")
+>     fun process(@RequestBody input: String) = chain.execute(input)
+> }
+> ```
 
 ## `ChainResult<T>`
 
@@ -222,23 +238,17 @@ Startup:
     → validateChainStartMethods()    // fail-fast on @ChainStart input/output type mismatches
     → logChains()                    // log all discovered chains
 
-Runtime (@ChainStart):
+Runtime:
   method(input)
-    → ChainStartAspect intercepts
+    → ChainStartAspect intercepts @ChainStart method
     → walks chain via ChainNode.invoke lambdas (zero reflection)
     → returns ChainResult.Success(finalOutput)
-
-Runtime (AOP on Chainable.proceed):
-  bean.proceed(input)
-    → ChainAspect intercepts
-    → walks chain via ChainNode.invoke lambdas (zero reflection)
-    → returns final output directly
 ```
 
 ## Limitations
 
 - **Linear chains only** — each step has at most one `next`. No branching or fan-out from a single step. Multiple chains can converge on a shared step, but a step cannot fork into multiple downstream paths.
-- **AOP return type** — when using AOP style on `Chainable.proceed()`, the return type at the injection point is the first step's output type, not the chain's final output type. Use `@ChainStart` for chains that transform types across steps.
 - **No conditional routing** — the chain path is fixed at startup via `@ChainStep(next = ...)`. There is no runtime conditional branching.
 - **Generics must be concrete** — `Chainable<I, O>` type parameters must be concrete classes (e.g., `String`, `Int`). Parameterized types like `List<String>` cannot be resolved due to JVM type erasure.
 - **One chain path per step** — a step can only declare one `next`. To reuse logic across different chains, extract it into a shared service called within the step's `proceed()`.
+- **AOP proxy required** — `@ChainStart` methods must be called through the Spring proxy (i.e., from outside the bean). Self-invocation within the same class bypasses the proxy and the chain will not execute. See the [AOP proxy note](#2-execute-the-chain) above.

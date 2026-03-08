@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.damirdenis-tudor"
-version = "0.0.1"
+version = "0.0.2"
 description = "Spring Boot auto-configured library for building type-safe processing chains using AOP and annotations"
 
 java {
@@ -32,6 +32,8 @@ dependencies {
     compileOnly("com.fasterxml.jackson.core:jackson-annotations")
 
     compileOnly("org.springframework.boot:spring-boot-starter-aop")
+
+    testImplementation("org.springframework.boot:spring-boot-starter-aop")
 
     // generate spring configuration metadata
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
