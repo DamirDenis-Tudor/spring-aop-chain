@@ -12,20 +12,13 @@ class ChainExecutor(@PublishedApi internal val chainMap: Map<String, ChainNode>)
         val chain = generateSequence(node) { it.nextId?.let(chainMap::get) }.toList()
 
         var result = input
-        val log = buildString {
-            append("Chain execution:")
-            chain.forEachIndexed { index, step ->
-                val stepInput = result.toString().take(100)
-                result = step.invoke(result)
-                val stepOutput = result.toString().take(100)
-                if (index == 0) {
-                    append("\n${step.id}: [input=$stepInput, output=$stepOutput]")
-                } else {
-                    append("\n   -> ${step.id}: [input=$stepInput, output=$stepOutput]")
-                }
-            }
-        }
-        logger.info(log)
+        chain.forEach { step -> result = step.invoke(result) }
+
+        logger.info(
+            "Chain executed: {}",
+            chain.joinToString(" -> ") { it.id }
+        )
+
         return ChainResult.Success(result)
     }
 }

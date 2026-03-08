@@ -24,7 +24,7 @@ Add the dependency to your project:
 
 ```kotlin
 // Gradle (Kotlin DSL)
-implementation("io.github.damirdenis-tudor:spring-aop-chain:0.0.2")
+implementation("io.github.damirdenis-tudor:spring-aop-chain:0.0.3")
 ```
 
 ```xml
@@ -32,7 +32,7 @@ implementation("io.github.damirdenis-tudor:spring-aop-chain:0.0.2")
 <dependency>
     <groupId>io.github.damirdenis-tudor</groupId>
     <artifactId>spring-aop-chain</artifactId>
-    <version>0.0.2</version>
+    <version>0.0.3</version>
 </dependency>
 ```
 
