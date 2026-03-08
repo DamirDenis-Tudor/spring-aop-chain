@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.damirdenis-tudor"
-version = "0.0.1-SNAPSHOT"
+version = "0.0.1"
 description = "Spring Boot auto-configured library for building type-safe processing chains using AOP and annotations"
 
 java {
@@ -29,6 +29,7 @@ dependencyManagement {
 dependencies {
     // Spring Boot auto configuration
     compileOnly("org.springframework.boot:spring-boot-autoconfigure")
+    compileOnly("com.fasterxml.jackson.core:jackson-annotations")
 
     implementation("org.springframework.boot:spring-boot-starter-aop")
 
@@ -43,7 +44,7 @@ dependencies {
 }
 
 allOpen {
-    annotation("io.github.damir.denis.tudor.spring.aop.chain.aspect.ChainStep")
+    annotation("io.github.damir.denis.tudor.spring.aop.chain.annotation.ChainStep")
 }
 
 kotlin {
