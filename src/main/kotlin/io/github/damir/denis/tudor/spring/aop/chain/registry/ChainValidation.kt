@@ -6,6 +6,9 @@ import org.springframework.aop.support.AopUtils
 import org.springframework.context.ApplicationContext
 import java.lang.reflect.ParameterizedType
 
+private fun Class<*>.boxed(): Class<*> =
+    if (isPrimitive) this.kotlin.javaObjectType else this
+
 private val logger = LoggerFactory.getLogger("io.github.damir.denis.tudor.spring.aop.chain.registry")
 
 internal fun Map<String, ChainNode>.validateChainTypes() {
@@ -62,6 +65,12 @@ internal fun Map<String, ChainNode>.validateChainStartMethods(ctx: ApplicationCo
 
                 val node = this[chainStart.node.java.name]
                     ?: error("@ChainStart method '${method.name}' references unknown node: ${chainStart.node.simpleName}")
+
+                val firstParam = method.parameterTypes.firstOrNull()?.boxed()
+                require(firstParam != null && node.inputType.isAssignableFrom(firstParam)) {
+                    "@ChainStart method '${method.name}' parameter is ${firstParam?.simpleName ?: "missing"} " +
+                            "but node '${node.id}' expects ${node.inputType.simpleName}"
+                }
 
                 val declaredResultType = genericReturn.actualTypeArguments[0] as? Class<*>
                 if (declaredResultType != null) {
