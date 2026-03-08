@@ -31,7 +31,7 @@ dependencies {
     compileOnly("org.springframework.boot:spring-boot-autoconfigure")
     compileOnly("com.fasterxml.jackson.core:jackson-annotations")
 
-    implementation("org.springframework.boot:spring-boot-starter-aop")
+    compileOnly("org.springframework.boot:spring-boot-starter-aop")
 
     // generate spring configuration metadata
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
